@@ -608,19 +608,37 @@ int main(int argc, char **argv) {
     u8 *content_buf, *decrypted_buf;
     u32 content_size;
 
-    retval = get_nus_object(1, 37, cidstr, &content_buf, &content_size);
-    if (retval < 0) debug_printf("get_nus_object(%s) returned %d, content size = %u\n", cidstr, retval, content_size);
+    retval = get_nus_object(INPUT_TITLEID_H, INPUT_TITLEID_L, cidstr, &content_buf, &content_size);
+    if (retval < 0) {
+		debug_printf("get_nus_object(%s) failed with error %d, content size = %u\n", 
+					cidstr, retval, content_size);
+		exit(1);
+	}
+	
+	if (content_buf == NULL) {
+		debug_printf("error allocating content buffer, size was %u\n", content_size);
+		exit(1);
+	}
+	
     if (content_size % 16) {
-      debug_printf("ERROR: downloaded content[%hu] size %u is not a multiple of 16\n", i, content_size);
+		debug_printf("ERROR: downloaded content[%hu] size %u is not a multiple of 16\n",
+					i, content_size);
+		free(content_buf);
+		exit(1);
     }
+
     if (content_size < p_cr[i].size) {
-      debug_printf("ERROR: only downloaded %u / %u bytes\n", content_size, p_cr[i].size);
-    } else {
-      decrypted_buf = malloc(content_size);
-	  if (!decrypted_buf) {
+		debug_printf("ERROR: only downloaded %u / %u bytes\n", content_size, p_cr[i].size);
+		free(content_buf);
+		exit(1);
+    } 
+
+	decrypted_buf = malloc(content_size);
+	if (!decrypted_buf) {
 		debug_printf("ERROR: failed to allocate decrypted_buf (%u bytes)\n", content_size);
 		exit(1);
 	}
+
 	decrypt_buffer(i, content_buf, decrypted_buf, content_size);
 
 	sha1 hash;
@@ -648,7 +666,7 @@ int main(int argc, char **argv) {
 	}
       
   }
-  /* this doesn't seem to work yet ... */
+
   if ((INPUT_TITLEID_H != OUTPUT_TITLEID_H) 
 	|| (INPUT_TITLEID_L != OUTPUT_TITLEID_L)) {
 		debug_printf("Changing titleid from %08x-%08x to %08x-%08x\n",
