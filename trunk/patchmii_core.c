@@ -496,8 +496,8 @@ s32 install(const signed_blob *s_tmd, const signed_blob *s_certs, u32 certs_len)
 
 int main(int argc, char **argv) {
 
-  console_setup();
-  printf("PatchMii Core v" VERSION ", by bushing\n");
+	console_setup();
+	printf("PatchMii Core v" VERSION ", by bushing\n");
 
 // ******* WARNING *******
 // Obviously, if you're reading this, you're obviously capable of disabling the
@@ -510,198 +510,212 @@ int main(int argc, char **argv) {
 // unless you have performed extensive testing and are willing to take on the risk
 // of bricking the systems of people to whom you give this code.  -bushing
 
-  if ((OUTPUT_TITLEID_H == 1) && (OUTPUT_TITLEID_L == 2)) {
-	printf("Sorry, I won't modify the system menu; too dangerous. :(\n");
-	while(1);
-  }
+	if ((OUTPUT_TITLEID_H == 1) && (OUTPUT_TITLEID_L == 2)) {
+		printf("Sorry, I won't modify the system menu; too dangerous. :(\n");
+		while(1);
+  	}
 
-  if ((OUTPUT_TITLEID_H == 1) && (OUTPUT_TITLEID_L == 30)) {
-	printf("Sorry, I won't modify IOS30; too dangerous. :(\n");
-	while(1);
-  }
+	if ((OUTPUT_TITLEID_H == 1) && (OUTPUT_TITLEID_L == 30)) {
+		printf("Sorry, I won't modify IOS30; too dangerous. :(\n");
+		while(1);
+  	}
 
-  printvers();
+	printvers();
   
-  int retval;
+	int retval;
 
-  ISFS_Initialize();
-  create_temp_dir();
-  printf("Initializing network."); fflush(stdout);
-  while (1) {
-  	retval = net_init ();
- 	if (retval < 0) {
-		if (retval != -EAGAIN) {
-			debug_printf ("net_init failed: %d\n", retval);
-			exit(0);
-		}
-    }
-	if (!retval) break;
-	usleep(100000);
-	printf("."); fflush(stdout);
-  }
+	if (ISFS_Initialize() || create_temp_dir()) {
+		perror("Failed to create temp dir: ");
+		exit(1);
+	}
 
-  printf("Done!\n");
-  signed_blob *s_tmd = NULL, *s_tik = NULL, *s_certs = NULL;
+  	printf("Initializing network."); fflush(stdout);
+  	while (1) {
+  		retval = net_init ();
+ 		if (retval < 0) {
+			if (retval != -EAGAIN) {
+				debug_printf ("net_init failed: %d\n", retval);
+				exit(0);
+			}
+    	}
+		if (!retval) break;
+		usleep(100000);
+		printf("."); fflush(stdout);
+  	}
 
-  u8 *temp_tmdbuf = NULL, *temp_tikbuf = NULL;
+  	printf("Done!\n");
+  	signed_blob *s_tmd = NULL, *s_tik = NULL, *s_certs = NULL;
 
-  static u8 tmdbuf[MAX_SIGNED_TMD_SIZE] ATTRIBUTE_ALIGN(0x20);
-  static u8 tikbuf[STD_SIGNED_TIK_SIZE] ATTRIBUTE_ALIGN(0x20);
+  	u8 *temp_tmdbuf = NULL, *temp_tikbuf = NULL;
+
+  	static u8 tmdbuf[MAX_SIGNED_TMD_SIZE] ATTRIBUTE_ALIGN(0x20);
+  	static u8 tikbuf[STD_SIGNED_TIK_SIZE] ATTRIBUTE_ALIGN(0x20);
   
-  u32 tmdsize;
+  	u32 tmdsize;
 
-  debug_printf("Downloading IOS%d metadata: ..", INPUT_TITLEID_L);
-  retval = get_nus_object(INPUT_TITLEID_H, INPUT_TITLEID_L, "tmd", &temp_tmdbuf, &tmdsize);
-  if(retval<0) debug_printf("get_nus_object(tmd) returned %d, tmdsize = %u\n", retval, tmdsize);
-  memcpy(tmdbuf, temp_tmdbuf, MIN(tmdsize, sizeof(tmdbuf)));
-  free(temp_tmdbuf);
+  	debug_printf("Downloading IOS%d metadata: ..", INPUT_TITLEID_L);
+  	retval = get_nus_object(INPUT_TITLEID_H, INPUT_TITLEID_L, "tmd", &temp_tmdbuf, &tmdsize);
+  	if (retval<0) {
+		debug_printf("get_nus_object(tmd) returned %d, tmdsize = %u\n", retval, tmdsize);
+		exit(1);
+	}
+	if (temp_tmdbuf == NULL) {
+		debug_printf("Failed to allocate temp buffer for encrypted content, size was %u\n", tmdsize);
+		exit(1);
+	}
+  	memcpy(tmdbuf, temp_tmdbuf, MIN(tmdsize, sizeof(tmdbuf)));
+	free(temp_tmdbuf);
 
-  s_tmd = (signed_blob *)tmdbuf;
-  if(!IS_VALID_SIGNATURE(s_tmd)) {
-    debug_printf("Bad TMD signature!\n");
-    return -1;
-  }
-  debug_printf("\b ..tmd..");
+	s_tmd = (signed_blob *)tmdbuf;
+	if(!IS_VALID_SIGNATURE(s_tmd)) {
+    	debug_printf("Bad TMD signature!\n");
+		exit(1);
+  	}
 
-  u32 ticketsize;
-  retval = get_nus_object(INPUT_TITLEID_H, INPUT_TITLEID_L, 
+  	debug_printf("\b ..tmd..");
+
+	u32 ticketsize;
+	retval = get_nus_object(INPUT_TITLEID_H, INPUT_TITLEID_L, 
 						  "cetk", &temp_tikbuf, &ticketsize);
 						
-  if (retval < 0) debug_printf("get_nus_object(cetk) returned %d, ticketsize = %u\n", retval, ticketsize);
-  memcpy(tikbuf, temp_tikbuf, MIN(ticketsize, sizeof(tikbuf)));
+	if (retval < 0) debug_printf("get_nus_object(cetk) returned %d, ticketsize = %u\n", retval, ticketsize);
+	memcpy(tikbuf, temp_tikbuf, MIN(ticketsize, sizeof(tikbuf)));
   
-  s_tik = (signed_blob *)tikbuf;
-  if(!IS_VALID_SIGNATURE(s_tik)) {
-    debug_printf("Bad tik signature!\n");
-    return -1;
-  }
+	s_tik = (signed_blob *)tikbuf;
+	if(!IS_VALID_SIGNATURE(s_tik)) {
+    	debug_printf("Bad tik signature!\n");
+		exit(1);
+  	}
   
-  free(temp_tikbuf);
+  	free(temp_tikbuf);
 
-  s_certs = (signed_blob *)haxx_certs;
-  if(!IS_VALID_SIGNATURE(s_certs)) {
-    debug_printf("Bad cert signature!\n");
-    return -1;
-  }
+	s_certs = (signed_blob *)haxx_certs;
+	if(!IS_VALID_SIGNATURE(s_certs)) {
+    	debug_printf("Bad cert signature!\n");
+		exit(1);
+  	}
 
-  debug_printf("\b ..ticket..");
+	debug_printf("\b ..ticket..");
 
-  u8 key[16];
-  get_title_key(s_tik, key);
-  aes_set_key(key);
+	u8 key[16];
+	get_title_key(s_tik, key);
+	aes_set_key(key);
 
-  const tmd *p_tmd;
-  tmd_content *p_cr;
-  p_tmd = (tmd*)SIGNATURE_PAYLOAD(s_tmd);
-  p_cr = TMD_CONTENTS(p_tmd);
+	const tmd *p_tmd;
+	tmd_content *p_cr;
+	p_tmd = (tmd*)SIGNATURE_PAYLOAD(s_tmd);
+	p_cr = TMD_CONTENTS(p_tmd);
         
-  print_tmd_summary(p_tmd);
+	print_tmd_summary(p_tmd);
 
-  debug_printf("Downloading contents: \n");
-  static char cidstr[32];
-  u16 i;
-  for(i=0;i<p_tmd->num_contents;i++) {
-    debug_printf("Downloading part %d/%d (%uK): ", i+1, 
-		 p_tmd->num_contents, p_cr[i].size / 1024);
-    sprintf(cidstr, "%08x", p_cr[i].cid);
-    
-    u8 *content_buf, *decrypted_buf;
-    u32 content_size;
+	debug_printf("Downloading contents: \n");
+	static char cidstr[32];
+	u16 i;
+	for (i=0;i<p_tmd->num_contents;i++) {
+	   debug_printf("Downloading part %d/%d (%uK): ", i+1, 
+					p_tmd->num_contents, p_cr[i].size / 1024);
+	   sprintf(cidstr, "%08x", p_cr[i].cid);
+   
+	   u8 *content_buf, *decrypted_buf;
+	   u32 content_size;
 
-    retval = get_nus_object(INPUT_TITLEID_H, INPUT_TITLEID_L, cidstr, &content_buf, &content_size);
-    if (retval < 0) {
-		debug_printf("get_nus_object(%s) failed with error %d, content size = %u\n", 
+	   retval = get_nus_object(INPUT_TITLEID_H, INPUT_TITLEID_L, cidstr, &content_buf, &content_size);
+	   if (retval < 0) {
+			debug_printf("get_nus_object(%s) failed with error %d, content size = %u\n", 
 					cidstr, retval, content_size);
-		exit(1);
-	}
-	
-	if (content_buf == NULL) {
-		debug_printf("error allocating content buffer, size was %u\n", content_size);
-		exit(1);
-	}
-	
-    if (content_size % 16) {
-		debug_printf("ERROR: downloaded content[%hu] size %u is not a multiple of 16\n",
-					i, content_size);
-		free(content_buf);
-		exit(1);
-    }
-
-    if (content_size < p_cr[i].size) {
-		debug_printf("ERROR: only downloaded %u / %u bytes\n", content_size, p_cr[i].size);
-		free(content_buf);
-		exit(1);
-    } 
-
-	decrypted_buf = malloc(content_size);
-	if (!decrypted_buf) {
-		debug_printf("ERROR: failed to allocate decrypted_buf (%u bytes)\n", content_size);
-		exit(1);
-	}
-
-	decrypt_buffer(i, content_buf, decrypted_buf, content_size);
-
-	sha1 hash;
-
-	SHA1(decrypted_buf, p_cr[i].size, hash);
-
-	if (!memcmp(p_cr[i].hash, hash, sizeof hash)) {
-		debug_printf("\b hash OK. ");
-		display_ios_tags(decrypted_buf, content_size);
-		if (patch_hash_check(decrypted_buf, content_size)) {
-			debug_printf("Updating TMD.\n");
-			SHA1(decrypted_buf, p_cr[i].size, hash);
-			memcpy(p_cr[i].hash, hash, sizeof hash);
-			tmd_dirty=1;
+			exit(1);
 		}
-	
-		retval = (int) save_nus_object(p_cr[i].cid, decrypted_buf, content_size);
-		if (retval < 0) debug_printf("save_nus_object(%x) returned %d\n", p_cr[i].cid, retval);
-	} else {
-		debug_printf("hash BAD\n");
-	}
-      
-	free(decrypted_buf);
-    free(content_buf);
-	}
-      
-  }
 
-  if ((INPUT_TITLEID_H != OUTPUT_TITLEID_H) 
-	|| (INPUT_TITLEID_L != OUTPUT_TITLEID_L)) {
+		if (content_buf == NULL) {
+			debug_printf("error allocating content buffer, size was %u\n", content_size);
+			exit(1);
+		}
+
+		if (content_size % 16) {
+			debug_printf("ERROR: downloaded content[%hu] size %u is not a multiple of 16\n",
+					i, content_size);
+			free(content_buf);
+			exit(1);
+		}
+
+   		if (content_size < p_cr[i].size) {
+			debug_printf("ERROR: only downloaded %u / %u bytes\n", content_size, p_cr[i].size);
+			free(content_buf);
+			exit(1);
+   		} 
+
+		decrypted_buf = malloc(content_size);
+		if (!decrypted_buf) {
+			debug_printf("ERROR: failed to allocate decrypted_buf (%u bytes)\n", content_size);
+			free(content_buf);
+			exit(1);
+		}
+
+		decrypt_buffer(i, content_buf, decrypted_buf, content_size);
+
+		sha1 hash;
+		SHA1(decrypted_buf, p_cr[i].size, hash);
+
+		if (!memcmp(p_cr[i].hash, hash, sizeof hash)) {
+			debug_printf("\b hash OK. ");
+			display_ios_tags(decrypted_buf, content_size);
+
+			if (patch_hash_check(decrypted_buf, content_size)) {
+				debug_printf("Updating TMD.\n");
+				SHA1(decrypted_buf, p_cr[i].size, hash);
+				memcpy(p_cr[i].hash, hash, sizeof hash);
+				tmd_dirty=1;
+			}
+
+			retval = (int) save_nus_object(p_cr[i].cid, decrypted_buf, content_size);
+			if (retval < 0) {
+				debug_printf("save_nus_object(%x) returned error %d\n", p_cr[i].cid, retval);
+				exit(1);
+			}
+		} else {
+			debug_printf("hash BAD\n");
+			exit(1);
+		}
+     
+		free(decrypted_buf);
+	   	free(content_buf);
+	}
+     
+	if ((INPUT_TITLEID_H != OUTPUT_TITLEID_H) 
+		|| (INPUT_TITLEID_L != OUTPUT_TITLEID_L)) {
 		debug_printf("Changing titleid from %08x-%08x to %08x-%08x\n",
 			INPUT_TITLEID_H, INPUT_TITLEID_L,
 			OUTPUT_TITLEID_H, OUTPUT_TITLEID_L);
 		change_ticket_title_id(s_tik, OUTPUT_TITLEID_H, OUTPUT_TITLEID_L);
 		change_tmd_title_id(s_tmd, OUTPUT_TITLEID_H, OUTPUT_TITLEID_L);
-  } 
+	} 
 
-  if (tmd_dirty) {
-    forge_tmd(s_tmd);
-    tmd_dirty = 0;
-  }
+	if (tmd_dirty) {
+    	forge_tmd(s_tmd);
+    	tmd_dirty = 0;
+  	}
 
-  if (tik_dirty) {
-    forge_tik(s_tik);
-    tik_dirty = 0;
-  }
+  	if (tik_dirty) {
+    	forge_tik(s_tik);
+    	tik_dirty = 0;
+  	}
 
-  debug_printf("Download complete. Installing:\n");
+  	debug_printf("Download complete. Installing:\n");
 
-  retval = install_ticket(s_tik, s_certs, haxx_certs_size);
-  if (retval) {
-    debug_printf("install_ticket returned %d\n", retval);
-    return 1;
-  }
+  	retval = install_ticket(s_tik, s_certs, haxx_certs_size);
+  	if (retval) {
+    	debug_printf("install_ticket returned %d\n", retval);
+		exit(1);
+  	}
 
-  retval = install(s_tmd, s_certs, haxx_certs_size);
+  	retval = install(s_tmd, s_certs, haxx_certs_size);
 		   
-  if (retval) {
-    debug_printf("install returned %d\n", retval);
-    return 1;
-  }
+  	if (retval) {
+    	debug_printf("install returned %d\n", retval);
+    	exit(1);
+  	}
 
-  debug_printf("Done!\n");
+  	debug_printf("Done!\n");
 
-  return 0;
+	exit(0);
 }
