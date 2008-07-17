@@ -571,6 +571,7 @@ int main(int argc, char **argv) {
   	static u8 tikbuf[STD_SIGNED_TIK_SIZE] ATTRIBUTE_ALIGN(0x20);
   
   	u32 tmdsize;
+	int update_tmd;
 
   	debug_printf("Downloading IOS%d metadata: ..", INPUT_TITLEID_L);
   	retval = get_nus_object(INPUT_TITLEID_H, INPUT_TITLEID_L, "tmd", &temp_tmdbuf, &tmdsize);
@@ -679,8 +680,12 @@ int main(int argc, char **argv) {
 			debug_printf("\b hash OK. ");
 			display_ios_tags(decrypted_buf, content_size);
 
-			if (patch_hash_check(decrypted_buf, content_size) ||
-			    patch_new_dvdlowunencrypted(decrypted_buf, content_size)) {
+			update_tmd = 0;
+			if(patch_hash_check(decrypted_buf, content_size))
+				update_tmd = 1;
+			if(patch_new_dvdlowunencrypted(decrypted_buf, content_size))
+				update_tmd = 1;
+			if(update_tmd == 1) {
 				debug_printf("Updating TMD.\n");
 				SHA1(decrypted_buf, p_cr[i].size, hash);
 				memcpy(p_cr[i].hash, hash, sizeof hash);
