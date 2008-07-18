@@ -370,7 +370,7 @@ int patch_hash_check(u8 *buf, u32 size) {
     if (!memcmp(buf + i, new_hash_check, sizeof new_hash_check)) {
       debug_printf("Found new-school ES hash check @ 0x%x, patching.\n", i);
       buf[i+1] = 0;
-      buf += 4;
+      i += 4;
       match_count++;
       continue;
     }
@@ -378,7 +378,7 @@ int patch_hash_check(u8 *buf, u32 size) {
     if (!memcmp(buf + i, old_hash_check, sizeof old_hash_check)) {
       debug_printf("Found old-school ES hash check @ 0x%x, patching.\n", i);
       buf[i+1] = 0;
-      buf += 4;
+      i += 4;
       match_count++;
       continue;
     }
@@ -397,7 +397,7 @@ int patch_new_dvdlowunencrypted(u8 *buf, u32 size)
     if (!memcmp(buf + i, old_table, sizeof old_table)) {
       debug_printf("Found new-school DVD_LowUnencryptedRead whitelist @ 0x%x, patching.\n", i);
       memcpy(buf + i, new_table, sizeof new_table);
-      buf += sizeof new_table;
+      i += sizeof new_table;
       match_count++;
       continue;
     }
