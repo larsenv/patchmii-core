@@ -89,7 +89,7 @@ char *spinner_chars="/-\\|";
 int spin = 0;
 
 void spinner(void) {
-//  debug_printf("\b%c ", spinner_chars[spin++]);
+  printf("\b%c", spinner_chars[spin++]);
   if(!spinner_chars[spin]) spin=0;
 }
 
@@ -128,7 +128,7 @@ int get_nus_object(u32 titleid1, u32 titleid2, char *content, u8 **outbuf, u32 *
   retval = http_request(buf, 1 << 31);
   if (!retval) {
     debug_printf("Error making http request\n");
-    return 0;
+    return 1;
   }
 
   retval = http_get_result(&http_status, outbuf, outlen); 
@@ -216,9 +216,10 @@ s32 install_nus_object (tmd *p_tmd, u16 index) {
   static u8 bounce_buf2[1024] ATTRIBUTE_ALIGN(0x20);
   u32 i;
   const tmd_content *p_cr = TMD_CONTENTS(p_tmd);
+  debug_printf("install_nus_object(%p, %lu)\n", p_tmd, index);
   
   int retval, fd, cfd, ret;
-  snprintf(filename, sizeof(filename), "/tmp/patchmii/%08x", index);
+  snprintf(filename, sizeof(filename), "/tmp/patchmii/%08x", p_cr[index].cid);
   
   fd = ISFS_Open (filename, ISFS_ACCESS_READ);
   
@@ -227,10 +228,11 @@ s32 install_nus_object (tmd *p_tmd, u16 index) {
     return fd;
   }
   set_encrypt_iv(index);
+  debug_printf("ES_AddContentStart(%016llx, %x)\n", p_tmd->title_id, index);
 
-  cfd = ES_AddContentStart(p_tmd->title_id, index);
+  cfd = ES_AddContentStart(p_tmd->title_id, p_cr[index].cid);
   if(cfd < 0) {
-    debug_printf(":\nES_AddContentStart(%016llx, %d) failed: %d\n",p_tmd->title_id, index, cfd);
+    debug_printf(":\nES_AddContentStart(%016llx, %x) failed: %d\n",p_tmd->title_id, index, cfd);
     ES_AddTitleCancel();
     return -1;
   }
@@ -659,7 +661,7 @@ int main(int argc, char **argv) {
 		}
 
    		if (content_size < p_cr[i].size) {
-			debug_printf("ERROR: only downloaded %u / %u bytes\n", content_size, p_cr[i].size);
+			debug_printf("ERROR: only downloaded %u / %llu bytes\n", content_size, p_cr[i].size);
 			free(content_buf);
 			exit(1);
    		} 
