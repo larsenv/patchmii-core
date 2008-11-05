@@ -341,7 +341,7 @@ bool http_request (const char *url, const u32 max_size) {
 			break;
 		}
 
-		sscanf (line, "HTTP/1.1 %u", &http_status);
+		sscanf (line, "HTTP/1.%*u %u", &http_status);
 		sscanf (line, "Content-Length: %u", &content_length);
 
 		free (line);
